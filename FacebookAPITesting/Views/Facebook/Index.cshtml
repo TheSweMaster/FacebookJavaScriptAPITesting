@@ -1,0 +1,214 @@
+﻿
+@{
+    ViewData["Title"] = "Index";
+}
+
+<h2>Facebook API Test Page</h2>
+
+<div id="profile" style="display: none"> </div>
+
+<div>
+    <fb:login-button id="fb-login-btn" scope="public_profile,email,user_birthday,user_posts,publish_actions"
+                     onlogin="checkLoginState();">
+    </fb:login-button>
+
+    <a id="fb-logout-action" href="#" onclick="fbLogout();" style="display: none">
+        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRPpj1VfzPA7Gh5kQ6c7V-lUr2vTrUMwXraldQoxzxWWvoGzB3-" height="20" alt="Log out icon" title="Log Out" style="margin: 5px"/>
+    </a>
+</div>
+
+<div id="menu" style="display: none">
+    <button id="getposts-btn" onclick="apiGetPosts()">Get Posts</button>
+    <div id="posts"> </div>
+
+    <div>
+        <form>
+            Message: <input id="input-message" type="text" />
+            Link: <input id="input-link" type="url" />
+            <input type="submit" id="publish-btn" onclick="apiPublishPosts()" value="Post On Facebook" />
+        </form>
+    </div>
+</div>
+
+<script>
+    window.fbAsyncInit = function () {
+        FB.init({
+            appId: '2041153809498028',
+            cookie: true,
+            xfbml: true,
+            version: 'v2.12'
+        });
+
+        FB.getLoginStatus(function (response) {
+            statusChangeCallback(response);
+        });
+    };
+
+    (function (d, s, id) {
+        var js, fjs = d.getElementsByTagName(s)[0];
+        if (d.getElementById(id)) { return; }
+        js = d.createElement(s); js.id = id;
+        js.src = "https://connect.facebook.net/en_US/sdk.js";
+        fjs.parentNode.insertBefore(js, fjs);
+    }(document, 'script', 'facebook-jssdk'));
+
+    function statusChangeCallback(response) {
+        if (response.status === 'connected') {
+            console.log('Logged in and authenticated');
+            setElements(true);
+            apiGetUserData();
+        } else {
+            console.log('Not authenticated');
+            setElements(false);
+        }
+    }
+
+    function checkLoginState() {
+        FB.getLoginStatus(function (response) {
+            statusChangeCallback(response);
+        });
+    }
+
+    function setElements(isLoggedIn) {
+        if (isLoggedIn) {
+            document.getElementById('fb-login-btn').style.display = 'none';
+            document.getElementById('fb-logout-action').style.display = 'block';
+            document.getElementById('menu').style.display = 'block';
+            document.getElementById('profile').style.display = 'block';
+        }
+        else {
+            document.getElementById('fb-login-btn').style.display = 'block';
+            document.getElementById('fb-logout-action').style.display = 'none';
+            document.getElementById('menu').style.display = 'none';
+            document.getElementById('profile').style.display = 'none';
+        }
+    }
+
+    function fbLogout() {
+        FB.logout(function (response) {
+            console.log('Logged out');
+            setElements(false);
+        });
+
+    }
+
+    function apiPublishPosts() {
+        document.getElementById('publish-btn').disabled = true;
+        var inputMessage = document.getElementById('input-message').value;
+        var inputLink = document.getElementById('input-link').value;
+        var inputType = "link";
+
+        FB.api(
+            '/me/feed',
+            'POST',
+            { message: inputMessage, type: inputType, link: inputLink },
+            function (response) {
+                console.log(response);
+                if (response && !response.error) {
+                    alert("Post published succesfully!");
+                    document.getElementById('input-message').value = '';
+                    document.getElementById('input-link').value = '';
+                    apiGetPosts();
+                }
+                document.getElementById('publish-btn').disabled = false;
+            }
+
+        );
+    }
+
+    function apiGetPosts() {
+        FB.api(
+            '/me/posts',
+            'GET',
+            { "fields": "link,message,name,picture" },
+            function (response) {
+                console.log(response);
+                if (response && !response.error) {
+                    buildPosts(response);
+                }
+            }
+        );
+    }
+
+    function apiUpdatePost(id) {
+        document.getElementById('update-post-btn-' + id).disabled = true;
+        var inputMessage = document.getElementById('input-message').value;
+        var inputLink = document.getElementById('input-link').value;
+
+        FB.api(
+            '/' + id,
+            'POST',
+            { message: inputMessage, link: inputLink },
+            function (response) {
+                console.log(response);
+                if (response && !response.error) {
+                    alert("Post updated succesfully!");
+                    document.getElementById('input-message').value = '';
+                    document.getElementById('input-link').value = '';
+                    apiGetPosts();
+                }
+                document.getElementById('update-post-btn-' + id).disabled = false;
+            }
+
+        );
+    }
+
+    function apiDeletePost(id) {
+        document.getElementById('delete-post-btn-' + id).disabled = true;
+        FB.api(
+            '/' + id,
+            'DELETE',
+            {},
+            function (response) {
+                console.log(response);
+                if (response && !response.error) {
+                    alert("Post has been deleted!");
+                    apiGetPosts();
+                }
+                document.getElementById('delete-post-btn-' + id).disabled = false;
+            }
+        );
+
+    }
+
+    function apiGetUserData() {
+        FB.api(
+            '/me?fields=name,email,birthday',
+            function (response) {
+                if (response && !response.error) {
+                    console.log(response);
+                    buildUserProfile(response);
+                }
+            }
+        );
+
+    }
+
+    function buildUserProfile(user) {
+        let profile = `
+            Logged in as: <b>${user.name}</b>
+        `;
+
+        document.getElementById('profile').innerHTML = profile;
+    }
+
+    function buildPosts(posts) {
+        let output = `<h3>Latest Posts</h3>`;
+        for (let i in posts.data) {
+            if (posts.data[i].message) {
+                output += `
+                    <p>
+                    <div>Message: ${posts.data[i].message}</div>
+                    <a href="${posts.data[i].link}"><img src="${posts.data[i].picture}" alt="${posts.data[i].name}" title="${posts.data[i].name}" /></a>
+                    <button id="update-post-btn-${posts.data[i].id}" onclick="apiUpdatePost('${posts.data[i].id}')">Update</button>
+                    <button id="delete-post-btn-${posts.data[i].id}" onclick="apiDeletePost('${posts.data[i].id}')">Delete</button>
+                    </p>
+                `;
+            }
+        }
+
+        document.getElementById('posts').innerHTML = output;
+    }
+
+
+</script>
